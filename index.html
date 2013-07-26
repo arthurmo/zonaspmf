@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+    <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+        <link rel="stylesheet" href="http://cdnjs.cloudflare.com/ajax/libs/openlayers/2.12/theme/default/style.css" type="text/css">
+        <link rel="stylesheet" href="style.css" type="text/css">
+    </head>
+    <body>
+    <h1 id="title">PMF - Zonas </h1>
+
+    <p id="shortdesc">
+        
+    </p>
+
+    <div id="map" class="smallmap"></div>
+
+    <div id="docs">
+        <p>
+            Informe um endereço: <input type=text id="endereco" name="endereco" value="Rua Dr. José Lourenço, 2255, Fortaleza, Ceará, Brasil" style="width: 200px;"><a href='#' onclick="getEndereco($('#endereco').val()); return false;">Procurar</a>
+        </p>
+        <div id="resultado">
+        </div>
+    </div>
+    <script src="http://cdnjs.cloudflare.com/ajax/libs/openlayers/2.12/OpenLayers.js"></script>
+    <script src="http://cdnjs.cloudflare.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+    <script>
+var map = new OpenLayers.Map({
+    div: "map",
+    layers: [
+        new OpenLayers.Layer.WMS(
+            "WMS", "http://vmap0.tiles.osgeo.org/wms/vmap0",
+            {layers: "basic"}
+        ),
+        new OpenLayers.Layer.Vector("Zonas", {
+            //visibility: false,
+            strategies: [new OpenLayers.Strategy.Fixed()],
+            protocol: new OpenLayers.Protocol.HTTP({
+                url: "zoneamento.kml",
+                format: new OpenLayers.Format.KML({
+                    extractStyles: true, 
+                    extractAttributes: true,
+                    maxDepth: 2
+                })
+            })
+        })
+    ],
+    center: new OpenLayers.LonLat(-38.520171288782, -3.7913380812159),
+    zoom: 11
+});
+//map.zoomToExtent( map.layers[1].getDataExtent() );
+
+var getEndereco = function( endereco ) {
+    $.ajax({
+        type : "GET",
+        dataType : "text",
+        url : 'http://maps.googleapis.com/maps/api/geocode/json',
+        data : { 
+            address: endereco,
+            sensor: true},
+        success: function(obj){
+            saida = JSON.parse(obj);
+            //saida.results[0].geometry.location.lat .lng
+            ponto = new OpenLayers.Geometry.Point( saida.results[0].geometry.location.lng, saida.results[0].geometry.location.lat)
+            resultado = false;
+            for( var i in map.layers[1].features ) {
+                if( map.layers[1].features[i].geometry.intersects(ponto) ) {
+                    resultado = map.layers[1].features[i];
+                }
+            }
+
+            if( resultado == false ) {
+                $('#resultado').html('Não foi achado nenhuma zona para este endereço: ' + saida.results[0].formatted_address);
+            } else {
+                $('#resultado').html('Endereço: ' + saida.results[0].formatted_address + '<br>' +
+                    '<b>Nome: </b>' + resultado.attributes.name + '<br>' + 
+                    '<b>Descrição: </b>' + resultado.attributes.description
+                 );
+            }
+
+
+        }
+    }); 
+}
+    </script>
+    </body>
+</html>
