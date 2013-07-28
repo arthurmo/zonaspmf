@@ -80,6 +80,8 @@ h6 {
     width: 512px;
     height: 256px;
     border: 1px solid #ccc;
+    width: 40%;
+    float:left;
 }
 #tags {
     display: none;
@@ -88,6 +90,10 @@ h6 {
 #docs {
     position: relative;
     white-space:pre-line;
+    float:left;
+    padding-left:10px;
+    width:40%;
+    margin-top: -20px;
 }
 #docs p {
     margin-bottom: 0.5em;

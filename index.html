@@ -5,9 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
     <meta name="apple-mobile-web-app-capable" content="yes">
         <link rel="stylesheet" href="http://cdnjs.cloudflare.com/ajax/libs/openlayers/2.12/theme/default/style.css" type="text/css">
+        <link rel="stylesheet" href="http://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.10.3/css/base/jquery-ui.css" type="text/css">
+        <link rel="stylesheet" href="loading.jqueryui.css" type="text/css">
         <link rel="stylesheet" href="style.css" type="text/css">
     </head>
     <body>
+        <div id="loading_dialog"></div>
     <h1 id="title">PMF - Zonas</h1>
 
     <p id="shortdesc">
@@ -17,27 +20,37 @@
     <div id="map" class="smallmap"></div>
 
     <div id="docs">
-        <p>
-            Informe um endereço: <input type=text id="endereco" name="endereco" value="Rua Dr. José Lourenço, 2255, Fortaleza, Ceará, Brasil" style="width: 200px;"><a href='#' onclick="getEndereco($('#endereco').val()); return false;">Procurar</a>
-        </p>
+            Informe um endereço: <input type=text id="endereco" name="endereco" value="Rua Dr. José Lourenço, 2255, Fortaleza, Ceará, Brasil" style="width: 200px;"> <a href='#' onclick="getEndereco($('#endereco').val()); return false;" class="btn btn-default">Procurar</a>
         <div id="resultado">
             Nenhum resultado...
         </div>
     </div>
     <script src="http://cdnjs.cloudflare.com/ajax/libs/openlayers/2.12/OpenLayers.js"></script>
     <script src="http://cdnjs.cloudflare.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+    <script src="http://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.10.3/jquery-ui.min.js"></script>
+    <script src="loading.jqueryui.js"></script>
+    <script src="http://maps.google.com/maps/api/js?v=3.2&sensor=false"></script>
     <script>
 
     var gmap = new OpenLayers.Layer.Google( "Google Streets",  {numZoomLevels: 22} );
 
-var map = new OpenLayers.Map({
-    div: "map",
-    layers: [
-        new OpenLayers.Layer.WMS(
-            "WMS", "http://vmap0.tiles.osgeo.org/wms/vmap0",
-            {layers: "basic"}
-        ),
-        new OpenLayers.Layer.Vector("Zonas", {
+    var projWGS84 = new OpenLayers.Projection("EPSG:4326");
+    var proj900913 = new OpenLayers.Projection("EPSG:900913");
+
+    var map = new OpenLayers.Map({  
+        units: 'm',
+        div: "map",
+        allOverlays: false,
+        eventListeners: {},
+        //projection: new OpenLayers.Projection("EPSG:4326"),
+        //displayProjection: new OpenLayers.Projection("EPSG:4326"),
+        //displayProjection: new OpenLayers.Projection("EPSG:900913"),
+        //restrictedExtent: new OpenLayers.Bounds(-9632289, 1472120, -2372600, -4398243),
+        //restrictedExtent: new OpenLayers.Bounds(-7396709, 361993, -3409753, -4006535),
+    });
+
+    var gmap = new OpenLayers.Layer.Google( "Google Streets",  {numZoomLevels: 22} );
+    var zonas = new OpenLayers.Layer.Vector("Zonas", {
             //visibility: false,
             strategies: [new OpenLayers.Strategy.Fixed()],
             protocol: new OpenLayers.Protocol.HTTP({
@@ -48,9 +61,10 @@ var map = new OpenLayers.Map({
                     maxDepth: 2
                 })
             })
-        }),
-        new OpenLayers.Layer.Vector("Hidrografia", {
-            visibility: false,
+        });
+
+    var hidro = new OpenLayers.Layer.Vector("Hidrografia", {
+            //visibility: false,
             strategies: [new OpenLayers.Strategy.Fixed()],
             protocol: new OpenLayers.Protocol.HTTP({
                 url: "hidrografia.kml",
@@ -60,12 +74,41 @@ var map = new OpenLayers.Map({
                     maxDepth: 2
                 })
             })
-        }),
-    ],
-    center: new OpenLayers.LonLat(-38.520171288782, -3.7913380812159),
-    zoom: 11
-});
-//map.zoomToExtent( map.layers[1].getDataExtent() );
+        });
+
+
+    var vectors = new OpenLayers.Layer.Vector(
+            "Simple Geometry",
+            {
+                styleMap: new OpenLayers.StyleMap({
+                    "default": {
+                        externalGraphic: "marker.png",
+                        //graphicWidth: 17,
+                        graphicHeight: 20,
+                        graphicYOffset: -19,
+                        rotation: 0,
+                        fillOpacity: 1
+                    },
+                    "select": {
+                        cursor: "crosshair",
+                        externalGraphic: "marker.png"
+                    }
+                })
+            }
+        );
+
+    map.addControl(new OpenLayers.Control.MousePosition({'id' : 'MousePositionX'}));
+    map.addControl(new OpenLayers.Control.Navigation({'zoomWheel' : true}));
+    //map.zoomToMaxExtent();
+    map.addLayers([gmap]);
+    registerEvents(zonas);
+    registerEvents(hidro);
+
+    
+
+map.zoomToExtent( map.layers[1].getDataExtent() );
+
+map.addLayer(vectors);
 
 var getEndereco = function( endereco ) {
     $.ajax({
@@ -79,7 +122,8 @@ var getEndereco = function( endereco ) {
         success: function(obj){
             saida = JSON.parse(obj);
             //saida.results[0].geometry.location.lat .lng
-            ponto = new OpenLayers.Geometry.Point( saida.results[0].geometry.location.lng, saida.results[0].geometry.location.lat)
+            ponto = new OpenLayers.Geometry.Point( saida.results[0].geometry.location.lng, saida.results[0].geometry.location.lat);
+            ponto = ponto.transform(projWGS84, proj900913);
             resultado = false;
             for( var i in map.layers[1].features ) {
                 if( map.layers[1].features[i].geometry.intersects(ponto) ) {
@@ -90,7 +134,10 @@ var getEndereco = function( endereco ) {
             if( resultado == false ) {
                 $('#resultado').html('Não foi achado nenhuma zona para este endereço: ' + saida.results[0].formatted_address);
             } else {
-                $('#resultado').html('Endereço: ' + saida.results[0].formatted_address + '<br>' +
+                vectors.addFeatures( new OpenLayers.Feature.Vector(ponto));
+                map.setCenter( new OpenLayers.LonLat(ponto.x, ponto.y) , 15);
+                $('#resultado').html('Endereço: ' + saida.results[0].formatted_address + '<br><br>' +
+                    'Este ponto é <b>' + Math.round(map.layers[2].features[0].geometry.distanceTo(ponto)) + 'm</b> de distância de algum corpo hidrográfico.<br><br>' +
                     '<b>Nome: </b>' + resultado.attributes.name + '<br>' + 
                     '<b>Descrição: </b>' + resultado.attributes.description
                  );
@@ -99,6 +146,45 @@ var getEndereco = function( endereco ) {
 
         }
     }); 
+}
+
+
+function registerEvents(layer) {
+    layer.events.register("loadstart", layer, function() {
+        loadingStart('Carregando camada...');
+    });
+    layer.events.register("loadend", layer, function() {
+        loadingEnd();
+        map.zoomToExtent( layer.getDataExtent() );
+    });
+    map.addLayer(layer);
+}
+var loadTimes = 0;
+var firstTime = false;
+
+function loadingStart( msg ) {
+    if (!firstTime) {
+        $('#loading_dialog').loading();
+        $('#loading_dialog').loading('loadStop');
+        firstTime = true;
+    }
+    loadTimes++;
+    if(msg) 
+        $('#loading_dialog').loading('loadStart', msg);    
+}
+function loadingEnd( msg ) {
+    loadTimes--;
+    if(loadTimes<0 )
+        loadTimes = 0;
+    if(loadTimes==0) {
+        $('#loading_dialog').loading('loadStart', 'Carregando...');
+        $('#loading_dialog').loading('loadStop');
+    }
+}
+function loadingStop() {
+    loadTimes = 0;
+    $('#loading_dialog').loading('loadStart', 'Carregando...');
+    $('#loading_dialog').loading('loadStop');
 }
     </script>
     </body>
