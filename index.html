@@ -8,7 +8,7 @@
         <link rel="stylesheet" href="style.css" type="text/css">
     </head>
     <body>
-    <h1 id="title">PMF - Zonas </h1>
+    <h1 id="title">PMF - Zonas</h1>
 
     <p id="shortdesc">
         
@@ -21,11 +21,15 @@
             Informe um endereço: <input type=text id="endereco" name="endereco" value="Rua Dr. José Lourenço, 2255, Fortaleza, Ceará, Brasil" style="width: 200px;"><a href='#' onclick="getEndereco($('#endereco').val()); return false;">Procurar</a>
         </p>
         <div id="resultado">
+            Nenhum resultado...
         </div>
     </div>
     <script src="http://cdnjs.cloudflare.com/ajax/libs/openlayers/2.12/OpenLayers.js"></script>
     <script src="http://cdnjs.cloudflare.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
     <script>
+
+    var gmap = new OpenLayers.Layer.Google( "Google Streets",  {numZoomLevels: 22} );
+
 var map = new OpenLayers.Map({
     div: "map",
     layers: [
@@ -44,7 +48,19 @@ var map = new OpenLayers.Map({
                     maxDepth: 2
                 })
             })
-        })
+        }),
+        new OpenLayers.Layer.Vector("Hidrografia", {
+            visibility: false,
+            strategies: [new OpenLayers.Strategy.Fixed()],
+            protocol: new OpenLayers.Protocol.HTTP({
+                url: "hidrografia.kml",
+                format: new OpenLayers.Format.KML({
+                    extractStyles: true, 
+                    extractAttributes: true,
+                    maxDepth: 2
+                })
+            })
+        }),
     ],
     center: new OpenLayers.LonLat(-38.520171288782, -3.7913380812159),
     zoom: 11
@@ -55,6 +71,7 @@ var getEndereco = function( endereco ) {
     $.ajax({
         type : "GET",
         dataType : "text",
+        units: 'm',
         url : 'http://maps.googleapis.com/maps/api/geocode/json',
         data : { 
             address: endereco,
